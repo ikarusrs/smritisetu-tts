@@ -61,7 +61,7 @@ async def generate_tts(request: TTSRequest):
         if result.returncode != 0:
             stderr = result.stderr.decode(errors="replace")
             logger.error(f"Piper error (rc={result.returncode}): {stderr}")
-            raise HTTPException(status_code=500, detail=f"TTS generation failed: {stderr[:200]}")
+            raise HTTPException(status_code=500, detail=f"TTS generation failed: {stderr[:1000]}")
 
         with open(tmp_path, "rb") as f:
             audio_data = f.read()
