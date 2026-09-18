@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 VOICE_MAP = {
-    "hi": "hi_IN-pratham-medium",
+    "hi": "hi_IN-pratham-medium.onnx",
     "en": "en_US-lessac-medium",
 }
 
@@ -60,7 +60,7 @@ async def generate_tts(request: TTSRequest):
 
         if result.returncode != 0:
             stderr = result.stderr.decode(errors="replace")
-            logger.error(f"Piper error: {stderr}")
+            logger.error(f"Piper error (rc={result.returncode}): {stderr}")
             raise HTTPException(status_code=500, detail=f"TTS generation failed: {stderr[:200]}")
 
         with open(tmp_path, "rb") as f:
