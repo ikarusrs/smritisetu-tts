@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
-from piper import PiperVoice
-import wave
-import io
+import subprocess
+import tempfile
+import os
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -17,16 +17,6 @@ VOICE_MAP = {
     "en": "en_US-lessac-medium",
 }
 
-# Load all voice models at startup
-voices = {}
-for lang, model in VOICE_MAP.items():
-    logger.info(f"Loading voice model: {model}")
-    try:
-        voices[lang] = PiperVoice.load(model, data_dir=["/voices"], download_dir="/voices")
-        logger.info(f"Loaded: {model}")
-    except Exception as e:
-        logger.error(f"Failed to load {model}: {e}")
-
 
 class TTSRequest(BaseModel):
     text: str
@@ -35,7 +25,7 @@ class TTSRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "voices": list(voices.keys())}
+    return {"status": "healthy", "voices": list(VOICE_MAP.keys())}
 
 
 @app.post("/tts")
@@ -46,27 +36,54 @@ async def generate_tts(request: TTSRequest):
     if len(request.text) > 500:
         raise HTTPException(status_code=400, detail="Text too long (max 500 characters)")
 
-    voice = voices.get(request.language)
-    if not voice:
+    model = VOICE_MAP.get(request.language)
+    if not model:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
 
     logger.info(f"TTS request: lang={request.language}, len={len(request.text)}")
 
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp_path = tmp.name
+
     try:
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as wav_file:
-            voice.synthesize(request.text, wav_file)
-        buf.seek(0)
-        audio_data = buf.read()
+        cmd = [
+            "piper",
+            "--model", model,
+            "--output_file", tmp_path,
+        ]
+
+        result = subprocess.run(
+            cmd,
+            input=request.text.encode("utf-8"),
+            capture_output=True,
+            timeout=60,
+        )
+
+        if result.returncode != 0:
+            stderr = result.stderr.decode(errors="replace")
+            logger.error(f"Piper error: {stderr}")
+            raise HTTPException(status_code=500, detail=f"TTS generation failed: {stderr[:200]}")
+
+        with open(tmp_path, "rb") as f:
+            audio_data = f.read()
+
         logger.info(f"Generated {len(audio_data)} bytes")
         return Response(
             content=audio_data,
             media_type="audio/wav",
             headers={"Cache-Control": "no-store"},
         )
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="TTS generation timed out")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="TTS generation failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 if __name__ == "__main__":

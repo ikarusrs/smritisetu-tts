@@ -12,13 +12,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Create voice directory
 RUN mkdir -p /voices
 
-# Pre-download Assamese, Hindi, and English voices
-RUN python3 -c "from piper import PiperVoice; \
-    PiperVoice.load('as_IN-arambha-medium', download_dir='/voices', data_dir=['/voices'])" || true && \
-    python3 -c "from piper import PiperVoice; \
-    PiperVoice.load('hi_IN-arambha-medium', download_dir='/voices', data_dir=['/voices'])" || true && \
-    python3 -c "from piper import PiperVoice; \
-    PiperVoice.load('en_US-lessac-medium', download_dir='/voices', data_dir=['/voices'])" || true
+# Pre-download voice models
+RUN python3 -c "\
+from piper.download import get_voices, ensure_voice_exists, find_voice; \
+import os; \
+voices_info = get_voices('/voices', update_voices=True); \
+for v in ['as_IN-arambha-medium', 'hi_IN-arambha-medium', 'en_US-lessac-medium']; \
+    ensure_voice_exists(v, ['/voices'], '/voices', voices_info); \
+print('Done downloading voices')" || echo "Download step completed with warnings"
 
 # Copy application code
 COPY server.py .
