@@ -12,8 +12,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 VOICE_MAP = {
-    "as": "as_IN-arambha-medium",
-    "hi": "hi_IN-arambha-medium",
+    "hi": "hi_IN-pratham-medium",
     "en": "en_US-lessac-medium",
 }
 
