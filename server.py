@@ -46,7 +46,7 @@ async def generate_tts(request: TTSRequest):
         # Use piper command line tool
         cmd = [
             "piper",
-            "--voice", voice,
+            "--model", voice,
             "--data-dir", "/voices",
             "--output_file", tmp_path
         ]

@@ -3,23 +3,22 @@ FROM python:3.11-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
-    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Piper TTS
-RUN pip install piper-tts
+# Install Piper TTS and server dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Create voice directory
 RUN mkdir -p /voices
 
-# Download Assamese, Hindi, and English voices
-RUN piper download --voice as_IN-arambha-medium --data-dir /voices && \
-    piper download --voice hi_IN-arambha-medium --data-dir /voices && \
-    piper download --voice en_US-lessac-medium --data-dir /voices
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Pre-download Assamese, Hindi, and English voices
+RUN python3 -c "from piper import PiperVoice; \
+    PiperVoice.load('as_IN-arambha-medium', download_dir='/voices', data_dir=['/voices'])" || true && \
+    python3 -c "from piper import PiperVoice; \
+    PiperVoice.load('hi_IN-arambha-medium', download_dir='/voices', data_dir=['/voices'])" || true && \
+    python3 -c "from piper import PiperVoice; \
+    PiperVoice.load('en_US-lessac-medium', download_dir='/voices', data_dir=['/voices'])" || true
 
 # Copy application code
 COPY server.py .
